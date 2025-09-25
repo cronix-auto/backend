@@ -69,38 +69,38 @@ def clean_job_id(raw: str) -> str:
 
 
 def extract_value(fields: Iterable[dict], name: str) -> str:
-    ln = (name or "").lower()
-    for f in fields or []:
-        n = (f.get("name") or "").lower()
-        if ln in n:
-            return f.get("value", "")
+    target = (name or "").lower()
+    for field in fields or []:
+        label = (field.get("name") or "").lower()
+        if target in label:
+            return field.get("value", "")
     return ""
 
 
 def pick_place_id(fields, join_script_raw, default_place):
-    for f in fields or []:
-        n = (f.get("name") or "")
-        v = (f.get("value") or "")
-        if PLACE_FIELD_RE.search(n):
-            m = re.search(r"\d+", v or "")
-            if m:
+    for field in fields or []:
+        name = field.get("name") or ""
+        value = field.get("value") or ""
+        if PLACE_FIELD_RE.search(name):
+            match = re.search(r"\d+", value or "")
+            if match:
                 try:
-                    return int(m.group(0))
+                    return int(match.group(0))
                 except Exception:
                     pass
-    for f in fields or []:
-        v = (f.get("value") or "")
-        m = PLACEID_RE.search(v)
-        if m:
+    for field in fields or []:
+        value = field.get("value") or ""
+        match = PLACEID_RE.search(value)
+        if match:
             try:
-                return int(m.group(1))
+                return int(match.group(1))
             except Exception:
                 pass
     if join_script_raw:
-        m = PLACEID_RE.search(join_script_raw)
-        if m:
+        match = PLACEID_RE.search(join_script_raw)
+        if match:
             try:
-                return int(m.group(1))
+                return int(match.group(1))
             except Exception:
                 pass
     try:
@@ -122,14 +122,14 @@ def parse_money_m(value: str) -> float:
     """Parse money strings like '25M', '0.8M', '800K', '1200000' -> millions."""
     if not value:
         return 0.0
-    s = strip_md(value).upper()
-    m = NUM_RE.search(s)
-    if not m:
+    text = strip_md(value).upper()
+    match = NUM_RE.search(text)
+    if not match:
         return 0.0
-    num = float(m.group(1))
-    if "M" in s:
+    num = float(match.group(1))
+    if "M" in text:
         return num
-    if "K" in s:
+    if "K" in text:
         return num / 1000.0
     return num / 1_000_000.0
 
@@ -229,7 +229,6 @@ class CronixSniper:
         place_id: int = 109983668079237,
         local_ws_host: str = "127.0.0.1",
         local_ws_port: int = 8765,
-        api_base: str = "https://discord.com/api/v10",
         min_money_m: float = 0.0,
     ) -> None:
         self.token = token or os.getenv("DISCORD_TOKEN") or ""
@@ -238,7 +237,6 @@ class CronixSniper:
         self.place_id = place_id
         self.local_ws_host = local_ws_host
         self.local_ws_port = int(local_ws_port)
-        self.api = api_base
 
         self._running = False
         self._tasks: list[asyncio.Task] = []
@@ -344,8 +342,8 @@ class CronixSniper:
             embed_author,
             content.splitlines()[0] if content else "",
         ]
-        for cand in candidates:
-            clean = strip_md(cand or "")
+        for candidate in candidates:
+            clean = strip_md(candidate or "")
             if clean:
                 return clean
         return "Unknown"
@@ -359,12 +357,12 @@ class CronixSniper:
         author_name = ((embed.get("author") or {}).get("name")) or ""
 
         prioritized_job_sources: list[str] = []
-        for f in fields:
-            value = f.get("value") or ""
+        for field in fields:
+            value = field.get("value") or ""
             if not value:
                 continue
-            ln = (f.get("name") or "").lower()
-            if any(key in ln for key in ("job", "join", "server", "id")):
+            label = (field.get("name") or "").lower()
+            if any(key in label for key in ("job", "join", "server", "id")):
                 prioritized_job_sources.insert(0, value)
             else:
                 prioritized_job_sources.append(value)
@@ -375,10 +373,10 @@ class CronixSniper:
             return False
 
         money_sources: list[str] = []
-        for f in fields:
-            value = f.get("value") or ""
-            ln = (f.get("name") or "").lower()
-            if any(key in ln for key in ("money", "cash", "earn", "profit", "m/s", "per sec")):
+        for field in fields:
+            value = field.get("value") or ""
+            label = (field.get("name") or "").lower()
+            if any(key in label for key in ("money", "cash", "earn", "profit", "m/s", "per sec")):
                 money_sources.insert(0, value)
             else:
                 money_sources.append(value)
@@ -390,10 +388,10 @@ class CronixSniper:
             return False
 
         players_sources: list[str] = []
-        for f in fields:
-            value = f.get("value") or ""
-            ln = (f.get("name") or "").lower()
-            if "player" in ln or "slot" in ln:
+        for field in fields:
+            value = field.get("value") or ""
+            label = (field.get("name") or "").lower()
+            if "player" in label or "slot" in label:
                 players_sources.insert(0, value)
             else:
                 players_sources.append(value)
@@ -434,7 +432,7 @@ class CronixSniper:
         )
         return True
 
-    def _handle_message_payload(self, payload: dict, *, source: str) -> None:
+    def _handle_message_payload(self, payload: dict) -> None:
         cid = str(payload.get("channel_id") or "")
         if cid not in self.channel_ids:
             return
@@ -443,15 +441,14 @@ class CronixSniper:
         msg_ts = iso_to_epoch(ts) if ts else time.time()
         content = payload.get("content") or ""
         embeds = payload.get("embeds") or []
-        processed = False
 
+        handled = False
         for embed in embeds:
             if self._process_embed(embed or {}, content=content, msg_ts=msg_ts):
-                processed = True
+                handled = True
 
-        if not processed and content:
-            processed = self._process_plaintext(content, msg_ts=msg_ts)
-
+        if not handled and content:
+            self._process_plaintext(content, msg_ts=msg_ts)
 
     # ---- discord gateway loop --------------------------------------
     async def discord_gateway_loop(self) -> None:
@@ -482,6 +479,7 @@ class CronixSniper:
                         seq = None
                         session_id = None
                         zstream = GatewayZlibStream(self.log)
+
                         async def heartbeat() -> None:
                             while not stopped and self._running:
                                 if hb_interval is None:
@@ -558,7 +556,7 @@ class CronixSniper:
                                     continue
 
                                 if t in {"MESSAGE_CREATE", "MESSAGE_UPDATE"}:
-                                    self._handle_message_payload(d, source="gw")
+                                    self._handle_message_payload(d)
                         finally:
                             stopped = True
                             hb_task.cancel()
@@ -593,7 +591,7 @@ class CronixSniper:
                     self.log("[LOCAL WS] Lua disconnected")
                     self.status(ws="down")
 
-        srv = await websockets.serve(
+        server = await websockets.serve(
             handler,
             self.local_ws_host,
             self.local_ws_port,
@@ -603,8 +601,8 @@ class CronixSniper:
             compression=None,
         )
         self.log(f"[LOCAL WS] listening on ws://{self.local_ws_host}:{self.local_ws_port}")
-        self._local_ws_server = srv
-        return srv
+        self._local_ws_server = server
+        return server
 
     # ---- lifecycle --------------------------------------------------
     async def start(self) -> None:
@@ -612,9 +610,7 @@ class CronixSniper:
             return
         self._running = True
         await self.start_local_ws()
-        self._tasks = [
-            asyncio.create_task(self.discord_gateway_loop(), name="gw"),
-        ]
+        self._tasks = [asyncio.create_task(self.discord_gateway_loop(), name="gw")]
         self.log("Started")
         self.status(app="running", speed="ok")
 
