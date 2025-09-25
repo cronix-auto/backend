@@ -250,7 +250,6 @@ class CronixSniper:
         self.min_money_m = float(min_money_m)
         self.recent_brainrots: Deque[BrainrotRecord] = deque(maxlen=self.MAX_BRAINROT_HISTORY)
         self._brainrot_hashes: Deque[str] = deque(maxlen=512)
-        self._rest_fetch_scheduler: Optional[Callable[[str, str], None]] = None
 
     # ---- UI helpers -------------------------------------------------
     def set_min_money(self, m: float) -> None:
@@ -453,39 +452,6 @@ class CronixSniper:
         if not processed and content:
             processed = self._process_plaintext(content, msg_ts=msg_ts)
 
-        if not processed and source == "gw":
-            mid = str(payload.get("id") or "")
-            if mid and self._rest_fetch_scheduler:
-                self._rest_fetch_scheduler(cid, mid)
-
-    async def _hydrate_recent(self) -> None:
-        headers = {
-            "Authorization": f"Bot {self.token}" if self.use_bot_token else self.token,
-            "User-Agent": "CronixLocal/1.1",
-        }
-        timeout = aiohttp.ClientTimeout(total=15)
-        try:
-            async with aiohttp.ClientSession(headers=headers, timeout=timeout) as session:
-                for cid in self.channel_ids:
-                    if not self._running:
-                        break
-                    try:
-                        async with session.get(f"{self.api}/channels/{cid}/messages?limit=20") as resp:
-                            if resp.status != 200:
-                                continue
-                            messages = await resp.json()
-                    except Exception as exc:
-                        self.log(f"[hydrate] fetch error: {exc}")
-                        continue
-                    for message in reversed(messages):
-                        if not self._running:
-                            break
-                        message = dict(message)
-                        message.setdefault("channel_id", cid)
-                        self._handle_message_payload(message, source="hydrate")
-                    await asyncio.sleep(0.05)
-        except Exception as exc:
-            self.log(f"[hydrate] error: {exc}")
 
     # ---- discord gateway loop --------------------------------------
     async def discord_gateway_loop(self) -> None:
@@ -516,32 +482,6 @@ class CronixSniper:
                         seq = None
                         session_id = None
                         zstream = GatewayZlibStream(self.log)
-                        pending_fetch: set[str] = set()
-
-                        def schedule_fetch(cid: str, mid: str) -> None:
-                            key = f"{cid}:{mid}"
-                            if key in pending_fetch or not self._running:
-                                return
-                            pending_fetch.add(key)
-
-                            async def runner() -> None:
-                                await asyncio.sleep(0.35)
-                                try:
-                                    async with session.get(f"{self.api}/channels/{cid}/messages/{mid}") as resp:
-                                        if resp.status == 200:
-                                            message = await resp.json()
-                                            message = dict(message)
-                                            message.setdefault("channel_id", cid)
-                                            self._handle_message_payload(message, source="rest")
-                                except Exception:
-                                    pass
-                                finally:
-                                    pending_fetch.discard(key)
-
-                            asyncio.create_task(runner())
-
-                        self._rest_fetch_scheduler = schedule_fetch
-
                         async def heartbeat() -> None:
                             while not stopped and self._running:
                                 if hb_interval is None:
@@ -624,8 +564,6 @@ class CronixSniper:
                             hb_task.cancel()
                             with contextlib.suppress(Exception):
                                 await hb_task
-                            pending_fetch.clear()
-                            self._rest_fetch_scheduler = None
                 except Exception as exc:
                     self.log(f"⚠️ GW error: {exc}")
                     self.status(gw="down", speed="down")
@@ -676,7 +614,6 @@ class CronixSniper:
         await self.start_local_ws()
         self._tasks = [
             asyncio.create_task(self.discord_gateway_loop(), name="gw"),
-            asyncio.create_task(self._hydrate_recent(), name="hydrate"),
         ]
         self.log("Started")
         self.status(app="running", speed="ok")
@@ -697,7 +634,6 @@ class CronixSniper:
                 await self._local_ws_server.wait_closed()
         self._local_ws_server = None
         self.LOCAL_WS_CLIENT = None
-        self._rest_fetch_scheduler = None
         self.log("Stopped")
         self.status(app="stopped", gw="down", speed="down", ws="down")
 
