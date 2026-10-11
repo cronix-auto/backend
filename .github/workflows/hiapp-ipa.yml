@@ -1,4 +1,4 @@
-name: Build Forge Deep Blue IPA
+name: Build Forge 4 IPA
 
 on:
   push:
@@ -12,43 +12,47 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - name: Compile Deep Blue iPhone app
+      - name: Build native iPhone application
         shell: bash
         run: |
           set -euo pipefail
           xcodebuild -version
           SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
           mkdir -p Payload/HiApp.app
-          xcrun --sdk iphoneos swiftc -parse-as-library -target arm64-apple-ios16.0 -sdk "$SDK" -framework Charts \
-            hiapp/HiApp.swift hiapp/Dashboard.swift hiapp/Nutrition.swift \
-            hiapp/Training.swift hiapp/ProgressSettings.swift -o Payload/HiApp.app/HiApp
+          xcrun --sdk iphoneos swiftc -parse-as-library \
+            -target arm64-apple-ios17.0 -sdk "$SDK" -framework Charts \
+            forge4/Core.swift forge4/Theme.swift forge4/Home.swift \
+            forge4/Food.swift forge4/Training.swift forge4/Progress.swift \
+            forge4/Goals.swift \
+            -o Payload/HiApp.app/HiApp
           cat > Payload/HiApp.app/Info.plist <<'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0"><dict>
             <key>CFBundleExecutable</key><string>HiApp</string>
             <key>CFBundleIdentifier</key><string>com.cronix.hiapp</string>
-            <key>CFBundleName</key><string>HiApp</string>
-            <key>CFBundleDisplayName</key><string>Forge Blue</string>
+            <key>CFBundleName</key><string>Forge</string>
+            <key>CFBundleDisplayName</key><string>Forge</string>
             <key>CFBundlePackageType</key><string>APPL</string>
-            <key>CFBundleShortVersionString</key><string>3.0</string>
-            <key>CFBundleVersion</key><string>3</string>
+            <key>CFBundleShortVersionString</key><string>4.0</string>
+            <key>CFBundleVersion</key><string>4</string>
             <key>LSRequiresIPhoneOS</key><true/>
-            <key>MinimumOSVersion</key><string>16.0</string>
+            <key>MinimumOSVersion</key><string>17.0</string>
             <key>UIDeviceFamily</key><array><integer>1</integer></array>
             <key>UIUserInterfaceStyle</key><string>Dark</string>
             <key>UILaunchScreen</key><dict/>
           </dict></plist>
           PLIST
           plutil -lint Payload/HiApp.app/Info.plist
+          test -s Payload/HiApp.app/HiApp
+          ! grep -Eqi 'HealthKit|NSHealth' Payload/HiApp.app/Info.plist
           codesign --force --sign - Payload/HiApp.app
           codesign --verify --verbose=2 Payload/HiApp.app
-          test -s Payload/HiApp.app/HiApp
           zip -q -r HiApp.ipa Payload
           unzip -t HiApp.ipa
           shasum -a 256 HiApp.ipa
       - uses: actions/upload-artifact@v4
         with:
-          name: Forge-DeepBlue-IPA
+          name: Forge-BlackBlue-v4-IPA
           path: HiApp.ipa
           if-no-files-found: error
