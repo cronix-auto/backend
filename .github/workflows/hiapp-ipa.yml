@@ -1,8 +1,8 @@
-name: Build Forge 4 IPA
+name: Build IronLog IPA
 
 on:
   push:
-    branches: [hiapp-build-20261011]
+    branches: [hiapp-build-20261011, ironlog-build-20261011]
   workflow_dispatch:
 
 jobs:
@@ -31,11 +31,11 @@ jobs:
           <plist version="1.0"><dict>
             <key>CFBundleExecutable</key><string>HiApp</string>
             <key>CFBundleIdentifier</key><string>com.cronix.hiapp</string>
-            <key>CFBundleName</key><string>Forge</string>
+            <key>CFBundleName</key><string>IronLog</string>
             <key>CFBundleDisplayName</key><string>Forge</string>
             <key>CFBundlePackageType</key><string>APPL</string>
-            <key>CFBundleShortVersionString</key><string>4.0</string>
-            <key>CFBundleVersion</key><string>4</string>
+            <key>CFBundleShortVersionString</key><string>4.1</string>
+            <key>CFBundleVersion</key><string>5</string>
             <key>LSRequiresIPhoneOS</key><true/>
             <key>MinimumOSVersion</key><string>17.0</string>
             <key>UIDeviceFamily</key><array><integer>1</integer></array>
@@ -53,6 +53,6 @@ jobs:
           shasum -a 256 HiApp.ipa
       - uses: actions/upload-artifact@v4
         with:
-          name: Forge-BlackBlue-v4-IPA
+          name: IronLog-IPA
           path: HiApp.ipa
           if-no-files-found: error
