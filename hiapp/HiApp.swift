@@ -1,15 +1,50 @@
 import SwiftUI
-import HealthKit
 import Charts
 
 enum FitStyle {
-    static let bg = Color(red: 0.055, green: 0.065, blue: 0.083)
-    static let card = Color(red: 0.108, green: 0.122, blue: 0.150)
-    static let line = Color.white.opacity(0.085)
-    static let orange = Color(red: 1.0, green: 0.42, blue: 0.24)
-    static let mint = Color(red: 0.40, green: 0.90, blue: 0.73)
-    static let blue = Color(red: 0.39, green: 0.70, blue: 1.0)
-    static let muted = Color(red: 0.62, green: 0.67, blue: 0.73)
+    static let bg = Color(red: 0.019, green: 0.046, blue: 0.126)
+    static let card = Color(red: 0.043, green: 0.105, blue: 0.234)
+    static let line = Color.white.opacity(0.14)
+    static let orange = Color(red: 0.35, green: 0.70, blue: 1.0)
+    static let mint = Color(red: 0.51, green: 0.84, blue: 1.0)
+    static let blue = Color(red: 0.21, green: 0.48, blue: 0.98)
+    static let muted = Color(red: 0.65, green: 0.76, blue: 0.92)
+    static let pale = Color(red: 0.78, green: 0.91, blue: 1.0)
+    static let highlight = Color(red: 0.12, green: 0.32, blue: 0.67)
+}
+
+struct DeepBlueBackground: View {
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color(red: 0.013, green: 0.03, blue: 0.095), Color(red: 0.032, green: 0.096, blue: 0.23), FitStyle.bg],
+                startPoint: .topLeading, endPoint: .bottomTrailing
+            )
+            RadialGradient(colors: [FitStyle.blue.opacity(0.35), .clear],
+                           center: .topTrailing, startRadius: 10, endRadius: 380)
+            RadialGradient(colors: [FitStyle.mint.opacity(0.14), .clear],
+                           center: .bottomLeading, startRadius: 15, endRadius: 310)
+        }.ignoresSafeArea()
+    }
+}
+
+struct LiquidPanel: ViewModifier {
+    let corner: CGFloat
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .background(FitStyle.card.opacity(0.25), in: RoundedRectangle(cornerRadius: corner))
+                .glassEffect(.regular.tint(FitStyle.highlight.opacity(0.28)),
+                             in: RoundedRectangle(cornerRadius: corner))
+                .overlay(RoundedRectangle(cornerRadius: corner)
+                            .strokeBorder(.white.opacity(0.13), lineWidth: 0.65))
+        } else {
+            content
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: corner))
+                .overlay(RoundedRectangle(cornerRadius: corner)
+                            .strokeBorder(.white.opacity(0.13), lineWidth: 0.65))
+        }
+    }
 }
 
 struct FoodEntry: Codable, Identifiable {
@@ -140,76 +175,12 @@ final class FitStore: ObservableObject {
     var personalBest: LiftSet? { (workouts.flatMap { $0.sets } + activeSets).max { $0.kg < $1.kg } }
 }
 
-final class AppleHealth: ObservableObject {
-    @Published var steps = 0
-    @Published var activeCalories = 0
-    @Published var distanceKm = 0.0
-    @Published var latestWeightKg: Double?
-    @Published var workoutCount = 0
-    @Published var lastHeartRate: Int?
-    @Published var message = "Not connected"
-    @Published var hasRequested = UserDefaults.standard.bool(forKey: "fit.healthRequested")
-    private let store = HKHealthStore()
-
-    var available: Bool { HKHealthStore.isHealthDataAvailable() }
-
-    func connect() {
-        guard available else { message = "Apple Health unavailable on this device"; return }
-        let quantities: [HKQuantityTypeIdentifier] = [.stepCount, .activeEnergyBurned, .distanceWalkingRunning, .bodyMass, .heartRate]
-        var reading = Set<HKObjectType>()
-        for id in quantities { if let type = HKObjectType.quantityType(forIdentifier: id) { reading.insert(type) } }
-        reading.insert(HKObjectType.workoutType())
-        store.requestAuthorization(toShare: [], read: reading) { _, error in
-            DispatchQueue.main.async {
-                if let error = error { self.message = error.localizedDescription; return }
-                self.hasRequested = true
-                UserDefaults.standard.set(true, forKey: "fit.healthRequested")
-                self.message = "Access requested. Data depends on your Health permissions."
-                self.refresh()
-            }
-        }
-    }
-
-    func refresh() {
-        guard available && hasRequested else { return }
-        querySum(.stepCount, unit: .count()) { self.steps = Int($0) }
-        querySum(.activeEnergyBurned, unit: .kilocalorie()) { self.activeCalories = Int($0) }
-        querySum(.distanceWalkingRunning, unit: .meter()) { self.distanceKm = $0 / 1000.0 }
-        latestQuantity(.bodyMass, unit: .gramUnit(with: .kilo)) { self.latestWeightKg = $0 }
-        latestQuantity(.heartRate, unit: HKUnit.count().unitDivided(by: .minute())) { self.lastHeartRate = Int($0) }
-        let week = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
-        let predicate = HKQuery.predicateForSamples(withStart: week, end: Date())
-        let query = HKSampleQuery(sampleType: HKObjectType.workoutType(), predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, _ in
-            DispatchQueue.main.async { self.workoutCount = samples?.count ?? 0 }
-        }
-        store.execute(query)
-    }
-
-    private func querySum(_ id: HKQuantityTypeIdentifier, unit: HKUnit, update: @escaping (Double) -> Void) {
-        guard let type = HKObjectType.quantityType(forIdentifier: id) else { return }
-        let start = Calendar.current.startOfDay(for: Date())
-        let predicate = HKQuery.predicateForSamples(withStart: start, end: Date())
-        let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
-            let value = result?.sumQuantity()?.doubleValue(for: unit) ?? 0
-            DispatchQueue.main.async { update(value) }
-        }
-        store.execute(query)
-    }
-
-    private func latestQuantity(_ id: HKQuantityTypeIdentifier, unit: HKUnit, update: @escaping (Double) -> Void) {
-        guard let type = HKObjectType.quantityType(forIdentifier: id) else { return }
-        let order = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
-        let query = HKSampleQuery(sampleType: type, predicate: nil, limit: 1, sortDescriptors: [order]) { _, samples, _ in
-            guard let sample = samples?.first as? HKQuantitySample else { return }
-            DispatchQueue.main.async { update(sample.quantity.doubleValue(for: unit)) }
-        }
-        store.execute(query)
-    }
-}
-
 extension View {
     func fitCard() -> some View {
-        self.padding(16).background(FitStyle.card, in: RoundedRectangle(cornerRadius: 21, style: .continuous))
+        self.padding(17).modifier(LiquidPanel(corner: 23))
+    }
+    func liquidField() -> some View {
+        self.modifier(LiquidPanel(corner: 15))
     }
 }
 struct SmallLabel: View {
@@ -241,36 +212,31 @@ struct Headline: View {
 }
 
 struct RootTabs: View {
-    @EnvironmentObject var fit: FitStore
-    @EnvironmentObject var health: AppleHealth
     @State private var tab = 0
     var body: some View {
         TabView(selection: $tab) {
-            DashboardView(selectedTab: $tab).tabItem { Label("Home", systemImage: "square.grid.2x2.fill") }.tag(0)
-            NutritionView().tabItem { Label("Food", systemImage: "fork.knife") }.tag(1)
-            TrainingView().tabItem { Label("Train", systemImage: "dumbbell.fill") }.tag(2)
-            ProgressView().tabItem { Label("Progress", systemImage: "chart.xyaxis.line") }.tag(3)
-            SettingsView().tabItem { Label("Settings", systemImage: "slider.horizontal.3") }.tag(4)
+            DashboardView(selectedTab: $tab)
+                .tabItem { Label("Today", systemImage: "square.grid.2x2.fill") }.tag(0)
+            NutritionView()
+                .tabItem { Label("Food", systemImage: "fork.knife") }.tag(1)
+            TrainingView()
+                .tabItem { Label("Train", systemImage: "dumbbell.fill") }.tag(2)
+            ProgressView()
+                .tabItem { Label("Progress", systemImage: "chart.xyaxis.line") }.tag(3)
+            SettingsView()
+                .tabItem { Label("Goals", systemImage: "slider.horizontal.3") }.tag(4)
         }
-        .tint(FitStyle.orange)
+        .tint(FitStyle.pale)
         .preferredColorScheme(.dark)
-        .onAppear { health.refresh() }
     }
 }
 
 @main
 struct HiApp: App {
     @StateObject private var fit = FitStore()
-    @StateObject private var health = AppleHealth()
-    @Environment(\.scenePhase) private var phase
     var body: some Scene {
         WindowGroup {
-            RootTabs()
-                .environmentObject(fit)
-                .environmentObject(health)
-        }
-        .onChange(of: phase) { newPhase in
-            if newPhase == .active { health.refresh() }
+            RootTabs().environmentObject(fit)
         }
     }
 }
