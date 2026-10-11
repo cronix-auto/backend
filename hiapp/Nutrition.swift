@@ -43,7 +43,7 @@ struct NutritionView: View {
                         Image(systemName: "magnifyingglass").foregroundStyle(FitStyle.muted)
                         TextField("Search saved food examples", text: $search)
                             .autocorrectionDisabled()
-                    }.padding(13).background(FitStyle.card, in: RoundedRectangle(cornerRadius: 14))
+                    }.padding(13).modifier(LiquidPanel(corner: 14))
                     ForEach(foods) { food in
                         Button { selectedFood = food } label: {
                             HStack(spacing: 12) {
@@ -60,7 +60,7 @@ struct NutritionView: View {
                                     Text("\(Int(food.calories)) kcal").font(.subheadline.weight(.bold)).foregroundStyle(.white)
                                     Text("\(Int(food.protein))g protein").font(.caption2).foregroundStyle(FitStyle.muted)
                                 }
-                            }.padding(13).background(FitStyle.card, in: RoundedRectangle(cornerRadius: 16))
+                            }.padding(13).modifier(LiquidPanel(corner: 16))
                         }.buttonStyle(.plain)
                     }
                     if foods.isEmpty { Text("No matching examples. Add a custom food above.").font(.caption).foregroundStyle(FitStyle.muted) }
@@ -92,7 +92,7 @@ struct NutritionView: View {
                         .font(.caption2).foregroundStyle(FitStyle.muted).padding(.bottom, 8)
                 }.padding(18)
             }
-            .background(FitStyle.bg)
+            .background(DeepBlueBackground())
             .toolbar(.hidden, for: .navigationBar)
             .sheet(item: $selectedFood) { item in
                 QuickFoodSheet(food: item, day: day) { entry in fit.add(entry, on: day) }
