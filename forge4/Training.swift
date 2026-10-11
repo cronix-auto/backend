@@ -139,6 +139,21 @@ struct TrainPage: View {
                     littleStat("\(data.activeSets.count)", "All sets")
                 }
                 restTimer
+                HStack(spacing: 6) {
+                    TinyLabel(text: "Rest")
+                    Spacer(minLength: 3)
+                    ForEach([60, 90, 120, 180], id: \.self) { seconds in
+                        Button {
+                            data.goals.restSeconds = seconds
+                        } label: {
+                            Text("\(seconds / 60):\(seconds % 60 == 0 ? "00" : "30")")
+                                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                .foregroundStyle((data.goals.restSeconds ?? 90) == seconds ? .white : Forge.muted)
+                                .padding(.horizontal, 10).padding(.vertical, 8)
+                                .background((data.goals.restSeconds ?? 90) == seconds ? Forge.blue : Forge.inset, in: RoundedRectangle(cornerRadius: 8))
+                        }.buttonStyle(.plain)
+                    }
+                }
             }.surface()
 
             VStack(alignment: .leading, spacing: 14) {
@@ -255,8 +270,19 @@ struct TrainPage: View {
     private var previousPerformance: some View {
         VStack(alignment: .leading, spacing: 5) {
             if let prev = data.previousSets(for: exerciseName).filter(\.working).max(by: { $0.kg < $1.kg }) {
-                Text("LAST SESSION   \(prev.kg.short) kg × \(prev.reps)")
-                    .font(.system(size: 11, weight: .medium)).foregroundStyle(Forge.paleBlue)
+                HStack {
+                    Text("LAST SESSION   \(prev.kg.short) kg × \(prev.reps)")
+                        .font(.system(size: 11, weight: .medium)).foregroundStyle(Forge.paleBlue)
+                    Spacer()
+                    Button("LOAD LAST") {
+                        kilograms = prev.kg.short
+                        repetitions = String(prev.reps)
+                    }
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Forge.paleBlue)
+                    .padding(.horizontal, 9).padding(.vertical, 6)
+                    .background(Forge.darkBlue, in: RoundedRectangle(cornerRadius: 7))
+                }
             } else {
                 Text("No previous working sets for this exercise")
                     .font(.system(size: 11)).foregroundStyle(Forge.muted)
