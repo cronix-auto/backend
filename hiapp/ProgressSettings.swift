@@ -147,6 +147,7 @@ struct WeightLogSheet: View {
                 Spacer()
             }.padding(22).background(DeepBlueBackground())
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
+        }
         .presentationDetents([.medium])
     }
 }
