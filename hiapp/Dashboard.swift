@@ -3,7 +3,6 @@ import Charts
 
 struct DashboardView: View {
     @EnvironmentObject var fit: FitStore
-    @EnvironmentObject var health: AppleHealth
     @Binding var selectedTab: Int
     private var today: Date { Date() }
     private var calories: Double { fit.kcal(on: today) }
@@ -21,30 +20,26 @@ struct DashboardView: View {
                         macroTile("FATS", amount: fit.fat(on: today), goal: Double(fit.goals.fat), color: FitStyle.orange, unit: "g")
                     }
                     HStack {
-                        Text("APPLE HEALTH").font(.system(size: 12, weight: .bold, design: .rounded)).tracking(1.4)
+                        Text("YOUR MOMENTUM")
+                            .font(.system(size: 12, weight: .bold, design: .rounded)).tracking(1.4)
                         Spacer()
-                        Button { if health.hasRequested { health.refresh() } else { health.connect() } } label: {
-                            Label(health.hasRequested ? "Refresh" : "Connect", systemImage: "heart.text.square")
-                                .font(.system(size: 12, weight: .semibold))
-                        }.tint(FitStyle.mint)
+                        Text("Private & on-device").font(.caption2).foregroundStyle(FitStyle.muted)
                     }.padding(.top, 6)
                     HStack(spacing: 12) {
-                        healthTile("Steps", icon: "figure.walk", value: health.hasRequested ? health.steps.formatted() : "—", detail: "\(fit.goals.steps.formatted()) target", color: FitStyle.mint)
-                        healthTile("Active kcal", icon: "flame.fill", value: health.hasRequested ? health.activeCalories.formatted() : "—", detail: "From Apple Health", color: FitStyle.orange)
+                        healthTile("Meals today", icon: "fork.knife", value: "\(fit.meals(on: today).count)", detail: "Food entries", color: FitStyle.pale)
+                        healthTile("Workouts", icon: "dumbbell.fill", value: "\(fit.workouts.count)", detail: "Sessions logged", color: FitStyle.mint)
                     }
                     HStack(spacing: 12) {
-                        healthTile("Distance", icon: "point.topleft.down.curvedto.point.bottomright.up", value: health.hasRequested ? String(format: "%.1f km", health.distanceKm) : "—", detail: "Walking + running", color: FitStyle.blue)
-                        healthTile("Weight", icon: "scalemass.fill", value: ((fit.lastWeight ?? health.latestWeightKg).map { String(format: "%.1f kg", $0) } ?? "—"), detail: "Latest entry", color: FitStyle.mint)
+                        healthTile("Current weight", icon: "scalemass", value: fit.lastWeight.map { String(format: "%.1f kg", $0) } ?? "—", detail: "Manually logged", color: FitStyle.blue)
+                        healthTile("Goal weight", icon: "target", value: String(format: "%.0f kg", fit.goals.targetKg), detail: "Your target", color: FitStyle.pale)
                     }
                     waterCard
                     trainingCard
                     weekChart
-                    Text("Apple Health activity is shown separately. Exercise calories are not subtracted from your food target.")
-                        .font(.caption2).foregroundStyle(FitStyle.muted).padding(.bottom, 10)
                 }
                 .padding(18)
             }
-            .background(FitStyle.bg)
+            .background(DeepBlueBackground())
             .toolbar(.hidden, for: .navigationBar)
         }
     }
@@ -88,7 +83,8 @@ struct DashboardView: View {
             }
         }
         .padding(22)
-        .background(LinearGradient(colors: [FitStyle.orange, Color(red: 0.69, green: 0.20, blue: 0.21)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 24))
+        .background(LinearGradient(colors: [Color(red: 0.10, green: 0.35, blue: 0.79), Color(red: 0.026, green: 0.105, blue: 0.37), FitStyle.card], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 24))
+        .overlay(RoundedRectangle(cornerRadius: 24).strokeBorder(.white.opacity(0.19), lineWidth: 1))
     }
 
     private func macroTile(_ title: String, amount: Double, goal: Double, color: Color, unit: String) -> some View {
@@ -126,7 +122,7 @@ struct DashboardView: View {
                         Label("+\(amount) ml", systemImage: "plus")
                             .font(.subheadline.weight(.bold))
                             .frame(maxWidth: .infinity).padding(.vertical, 10)
-                            .background(FitStyle.bg, in: RoundedRectangle(cornerRadius: 12))
+                            .modifier(LiquidPanel(corner: 12))
                     }.buttonStyle(.plain)
                 }
             }
@@ -136,7 +132,7 @@ struct DashboardView: View {
     private var trainingCard: some View {
         HStack(spacing: 14) {
             Image(systemName: "dumbbell.fill").font(.title).foregroundStyle(FitStyle.orange)
-                .frame(width: 54, height: 54).background(FitStyle.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 17))
+                .frame(width: 54, height: 54).background(FitStyle.blue.opacity(0.17), in: RoundedRectangle(cornerRadius: 17))
             VStack(alignment: .leading, spacing: 3) {
                 Text(fit.currentWorkout == nil ? "Ready to train?" : "Session in progress").font(.headline)
                 Text(fit.currentWorkout ?? "Push, pull, legs and more").font(.caption).foregroundStyle(FitStyle.muted).lineLimit(1)
