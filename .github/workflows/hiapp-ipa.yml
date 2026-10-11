@@ -1,0 +1,47 @@
+name: Build HiApp IPA
+
+on:
+  push:
+    branches: [hiapp-build-20261011]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile iOS app
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p Payload/HiApp.app
+          SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
+          xcrun swiftc -parse-as-library -target arm64-apple-ios16.0 -sdk "$SDK" hiapp/HiApp.swift -o Payload/HiApp.app/HiApp
+          cat > Payload/HiApp.app/Info.plist <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>CFBundleExecutable</key><string>HiApp</string>
+            <key>CFBundleIdentifier</key><string>com.cronix.hiapp</string>
+            <key>CFBundleName</key><string>HiApp</string>
+            <key>CFBundleDisplayName</key><string>Hi</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleShortVersionString</key><string>1.0</string>
+            <key>CFBundleVersion</key><string>1</string>
+            <key>LSRequiresIPhoneOS</key><true/>
+            <key>MinimumOSVersion</key><string>16.0</string>
+            <key>UIDeviceFamily</key><array><integer>1</integer></array>
+            <key>UILaunchScreen</key><dict/>
+          </dict></plist>
+          PLIST
+          plutil -lint Payload/HiApp.app/Info.plist
+          test -s Payload/HiApp.app/HiApp
+          zip -q -r HiApp.ipa Payload
+          unzip -t HiApp.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HiApp-ipa
+          path: HiApp.ipa
+          if-no-files-found: error
