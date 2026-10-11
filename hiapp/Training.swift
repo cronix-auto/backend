@@ -73,7 +73,7 @@ struct TrainingView: View {
                         }.fitCard()
                     }
                 }.padding(18)
-            }.background(FitStyle.bg).toolbar(.hidden, for: .navigationBar)
+            }.background(DeepBlueBackground()).toolbar(.hidden, for: .navigationBar)
         }
     }
 
