@@ -1,4 +1,4 @@
-name: Build HiApp IPA
+name: Build Forge iPhone IPA
 
 on:
   push:
@@ -12,13 +12,13 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - name: Compile iOS app
+      - name: Compile and package iOS app
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p Payload/HiApp.app
           SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
-          xcrun swiftc -parse-as-library -target arm64-apple-ios16.0 -sdk "$SDK" hiapp/HiApp.swift -o Payload/HiApp.app/HiApp
+          xcrun swiftc -parse-as-library -target arm64-apple-ios16.0 -sdk "$SDK" -framework HealthKit -framework Charts hiapp/*.swift -o Payload/HiApp.app/HiApp
           cat > Payload/HiApp.app/Info.plist <<'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -26,22 +26,36 @@ jobs:
             <key>CFBundleExecutable</key><string>HiApp</string>
             <key>CFBundleIdentifier</key><string>com.cronix.hiapp</string>
             <key>CFBundleName</key><string>HiApp</string>
-            <key>CFBundleDisplayName</key><string>Hi</string>
+            <key>CFBundleDisplayName</key><string>Forge</string>
             <key>CFBundlePackageType</key><string>APPL</string>
-            <key>CFBundleShortVersionString</key><string>1.0</string>
-            <key>CFBundleVersion</key><string>1</string>
+            <key>CFBundleShortVersionString</key><string>2.0</string>
+            <key>CFBundleVersion</key><string>2</string>
             <key>LSRequiresIPhoneOS</key><true/>
             <key>MinimumOSVersion</key><string>16.0</string>
             <key>UIDeviceFamily</key><array><integer>1</integer></array>
+            <key>UIUserInterfaceStyle</key><string>Dark</string>
+            <key>NSHealthShareUsageDescription</key><string>Forge reads steps, activity, weight, workouts, sleep and resting heart rate to show your fitness progress.</string>
+            <key>NSHealthUpdateUsageDescription</key><string>Forge can save your new food logs and finished workouts to Apple Health when you enable sync.</string>
             <key>UILaunchScreen</key><dict/>
           </dict></plist>
           PLIST
+          cat > HealthKit.entitlements <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>com.apple.developer.healthkit</key><true/>
+          </dict></plist>
+          PLIST
           plutil -lint Payload/HiApp.app/Info.plist
+          plutil -lint HealthKit.entitlements
+          codesign --force --sign - --entitlements HealthKit.entitlements Payload/HiApp.app
+          codesign --verify --verbose=2 Payload/HiApp.app
+          codesign -d --entitlements :- Payload/HiApp.app 2>&1 | grep -q com.apple.developer.healthkit
           test -s Payload/HiApp.app/HiApp
           zip -q -r HiApp.ipa Payload
           unzip -t HiApp.ipa
       - uses: actions/upload-artifact@v4
         with:
-          name: HiApp-ipa
+          name: Forge-HiApp-ipa
           path: HiApp.ipa
           if-no-files-found: error
