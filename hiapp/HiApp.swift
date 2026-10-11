@@ -221,7 +221,7 @@ struct RootTabs: View {
                 .tabItem { Label("Food", systemImage: "fork.knife") }.tag(1)
             TrainingView()
                 .tabItem { Label("Train", systemImage: "dumbbell.fill") }.tag(2)
-            ProgressView()
+            ProgressScreenView()
                 .tabItem { Label("Progress", systemImage: "chart.xyaxis.line") }.tag(3)
             SettingsView()
                 .tabItem { Label("Goals", systemImage: "slider.horizontal.3") }.tag(4)
