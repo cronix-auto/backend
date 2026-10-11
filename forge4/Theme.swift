@@ -121,7 +121,7 @@ extension Date {
     var dayTitle: String { formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()) }
 }
 struct AppTabs: View {
-    @State private var selection = 0
+    @State private var selection = 2
     var body: some View {
         TabView(selection: $selection) {
             HomePage(selection: $selection)
